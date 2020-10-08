@@ -1,2 +1,1 @@
-# puffer
-Puffer social network
+README
