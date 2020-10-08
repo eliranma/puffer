@@ -71,7 +71,7 @@ const isEmail = (email) => {
 
 //Sign up route
 app.post('/signup', (req, res)=>{
-    newUser = {
+    const newUser = {
         email: req.body.email,
         password: req.body.password,
         confirmPaswword: req.body.confirmPassword,
@@ -115,7 +115,7 @@ app.post('/signup', (req, res)=>{
            createdAt: new Date().toISOString(),
            userId
        };
-      return db.doc(`/users/${newUser.handle}`).set(userCredentials)
+      return db.doc(`/users/${newUser.handle}`).set(userCredentials);
     })
     .then(()=>{
         return res.json(201).json({token})
@@ -129,19 +129,31 @@ app.post('/signup', (req, res)=>{
         }
     })
 
-    // firebase.auth()
-    // .createUserWithEmailAndPassword(newUser.email, newUser.password)
-    // .then((data)=>{
-    //     return res
-    //     .status(201)
-    //     .json({message: `${data.user.uid} signud up succesfully`});
-    // })
-    // .catch((err) =>{
-    //     console.error(err);
-    //     return res.status(500).json({error: err.code});
-
-    // })
 });
 
+
+app.post('/login',(req, res)=>{
+    const user = {
+        email:req.body.email,
+        password:req.body.password
+    };
+    let errors = {};
+
+    if(isEmpty(newUser.password)) errors.password = 'Must not be empty';
+    if(isEmpty(newUser.email)) errors.email = 'Must not be empty';
+
+    if(Object.keys(erros).length > 0) return  res.status(400).json(erros);
+    firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+    .then(data =>{
+        return data.getIdToken();
+    })
+    .then(token => {
+        return res.json({token});
+    })
+    .catch(err => {
+        console.error(err);
+        return res.status(500).json({error: err.code});
+    });
+})
 
 exports.api = functions.region('europe-west1').https.onRequest(app);
