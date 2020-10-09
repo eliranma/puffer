@@ -41,11 +41,40 @@ app.get('/posts', (req, res) =>{
     .catch((err) => console.log(err));
 });
 
-app.post('/post', (req, res) =>{
+const FBAuth = (req, res, next) => {
+    let idToken;
+    if(req.headers.authorization && req.headers.authorization.startsWith('Bearer ')){
+        idToken = req.headers.authorization.split('Bearer ')[1];
+    }   else {
+        console.error('No token found')
+        return res.status(403).json({error: 'Unauthorized'});
+    }
+    admin.auth().verifyIdToken(idToken)
+    .then((decodedToken) =>{
+        req.user = decodedToken;
+        console.log(decodedToken);
+        return db.collection('users')
+        .where('userId', '==', req.user.uid)
+        .limit(1)
+        .get();
+    })
+    .then(data =>{
+        req.user.handle = data.docs[0].data().handle;
+        return next();
+    })
+    .catch(err => {
+        console.error('Error while trying to verify');
+    })
+}
+
+app.post('/post', FBAuth, (req, res) =>{
+    if(req.body.body.trim() === ''){
+        return res.status(400).json({body:'Cant send empty Post'});
+    }
     const newPost = {
         body: req.body.body,
         createdAt: new Date().toISOString(),
-        userHandle: req.body.userHandle
+        userHandle: req.user.handle
     };
     db.collection('posts')
     .add(newPost)
@@ -75,7 +104,7 @@ app.post('/signup', (req, res)=>{
         email: req.body.email,
         password: req.body.password,
         confirmPaswword: req.body.confirmPassword,
-        handle: req.body.handle,
+        handle: req.body.handle
     };
     let errors = {};
 
@@ -89,7 +118,7 @@ app.post('/signup', (req, res)=>{
     if(newUser.password !== newUser.confirmPassword ) errors.confirmPassword = 'Passwords must be match';
     if(isEmpty(newUser.handle)) errors.handle = 'Must not be empty';
 
-    if(Object.keys(errors).length > 0 ) return res.status(400).json(`${errors}`)
+    if(Object.keys(errors).length > 0 ) return res.status(400).json(`${errors}`);
 
 //validate data
     let token, userId;
@@ -105,7 +134,7 @@ app.post('/signup', (req, res)=>{
     })
     .then(data =>{
         userId = data.user.uid;
-        return data.user.getIdToken()
+        return data.user.getIdToken();
     })
     .then((tokenId) => {
         token = tokenId
@@ -139,19 +168,22 @@ app.post('/login',(req, res)=>{
     };
     let errors = {};
 
-    if(isEmpty(newUser.password)) errors.password = 'Must not be empty';
-    if(isEmpty(newUser.email)) errors.email = 'Must not be empty';
+    if(isEmpty(user.password)) errors.password = 'Must not be empty';
+    if(isEmpty(user.email)) errors.email = 'Must not be empty';
 
-    if(Object.keys(erros).length > 0) return  res.status(400).json(erros);
+    if(Object.keys(errors).length > 0) return  res.status(400).json(errors);
     firebase.auth().signInWithEmailAndPassword(user.email, user.password)
     .then(data =>{
-        return data.getIdToken();
+        return data.user.getIdToken();
     })
-    .then(token => {
+    .then((token) => {
         return res.json({token});
     })
-    .catch(err => {
+    .catch((err) => {
         console.error(err);
+        if (err.code === 'auth/wrong-password'){
+            return res.status(403).json({general: 'Wrong Password, Access denied, Please try again'});
+        }   else 
         return res.status(500).json({error: err.code});
     });
 })
