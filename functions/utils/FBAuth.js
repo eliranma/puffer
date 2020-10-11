@@ -32,5 +32,5 @@ module.exports = (req, res, next) => {
     .catch((err) => {
         console.error('Error while trying to verify', err);
         return res.status(403).json(err);
-    })
-}
+    });
+};
